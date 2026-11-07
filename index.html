@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <!-- 1. YOUTUBE PLAYABLES SDK (BẮT BUỘC Ở ĐẦU THẺ HEAD) -->
+    <script src="https://www.youtube.com/game_api/v1"></script>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Orbit Survivor: YouTube Playables Edition</title>
+
+    <!-- Google Fonts: Orbitron & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Phaser 3 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: none;
+        }
+
+        html, body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #030712;
+            background-image: radial-gradient(circle at 50% 50%, #0b1528 0%, #030712 100%);
+            font-family: 'Outfit', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+
+        #game-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: absolute;
+            top: 0;
+            left: 0;
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+            box-shadow: 0 0 50px rgba(2, 132, 199, 0.3);
+            outline: none;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        /* POPUP CHỌN KỸ NĂNG HTML/CSS OVERLAY CHUẨN HITBOX 100% */
+        #skill-modal-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 99999;
+            background: rgba(3, 7, 18, 0.90);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            display: none !important;
+            pointer-events: none !important;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            box-sizing: border-box;
+            animation: skillModalFadeIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        #skill-modal-overlay.active {
+            display: flex !important;
+            pointer-events: auto !important;
+        }
+
+        #skill-modal-overlay.hidden,
+        .modal-hidden {
+            display: none !important;
+            pointer-events: none !important;
+            visibility: hidden !important;
+        }
+
+        /* NÚT HTML BẮT ĐẦU CHƠI DỰ PHÒNG CHO HEADLESS TEST (ẨN HOÀN TOÀN KHỎI GIAO DIỆN ĐỂ TRÁNH ĐÈ LÊN PHASER UI) */
+        #start-game-btn {
+            display: none !important;
+            pointer-events: none !important;
+            visibility: hidden !important;
+            position: absolute;
+            opacity: 0 !important;
+        }
+
+        @keyframes skillModalFadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .skill-modal-header {
+            text-align: center;
+            margin-bottom: 22px;
+        }
+
+        .skill-modal-title {
+            font-family: 'Orbitron', Outfit, sans-serif;
+            font-size: 24px;
+            font-weight: 800;
+            color: #facc15;
+            text-shadow: 0 0 16px rgba(250, 204, 21, 0.45);
+            margin-bottom: 6px;
+            letter-spacing: 1px;
+        }
+
+        .skill-modal-subtitle {
+            font-family: 'Outfit', sans-serif;
+            font-size: 15px;
+            font-weight: 600;
+            color: #38bdf8;
+        }
+
+        .skill-cards-grid {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: stretch;
+            max-width: 860px;
+            width: 100%;
+        }
+
+        .skill-card {
+            flex: 1;
+            max-width: 230px;
+            min-width: 180px;
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 22px 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+            border: 2px solid #38bdf8;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            position: relative;
+            user-select: none;
+            -webkit-user-select: none;
+            box-sizing: border-box;
+        }
+
+        .skill-card:hover {
+            transform: translateY(-8px) scale(1.06);
+            border-color: #facc15 !important;
+            background: #273549;
+            box-shadow: 0 16px 36px rgba(56, 189, 248, 0.35);
+        }
+
+        .skill-card:active {
+            transform: translateY(-4px) scale(1.02);
+        }
+
+        .skill-icon-circle {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            margin-bottom: 12px;
+            border: 2px solid;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .skill-card-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            color: #ffffff;
+            text-align: center;
+            margin-bottom: 6px;
+            line-height: 1.3;
+        }
+
+        .skill-card-rarity {
+            font-family: 'Outfit', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .skill-card-desc {
+            font-family: 'Outfit', sans-serif;
+            font-size: 13px;
+            color: #94a3b8;
+            text-align: center;
+            line-height: 1.4;
+            margin-bottom: 20px;
+            flex-grow: 1;
+        }
+
+        .select-skill-btn {
+            width: 100%;
+            height: 42px;
+            border-radius: 10px;
+            border: none;
+            background: #22c55e;
+            color: #ffffff;
+            font-family: 'Orbitron', Outfit, sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+            box-shadow: 0 4px 14px rgba(34, 197, 94, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .select-skill-btn:hover {
+            background: #4ade80 !important;
+            transform: scale(1.04);
+            box-shadow: 0 6px 20px rgba(74, 222, 128, 0.6);
+        }
+
+        .select-skill-btn:active {
+            transform: scale(0.96);
+        }
+    </style>
+    <script>
+        // Chặn zoom và cuộn trang trên trình duyệt điện thoại
+        document.addEventListener('gesturestart', function(e) { e.preventDefault(); });
+        document.addEventListener('gesturechange', function(e) { e.preventDefault(); });
+        document.addEventListener('gestureend', function(e) { e.preventDefault(); });
+        window.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+    </script>
+</head>
+<body>
+    <div id="game-container"></div>
+    <button id="start-game-btn" type="button" aria-label="Bắt đầu chơi game" style="display: none !important;"></button>
+
+    <!-- CÁC MODULE GAME ENGINE ĐỘC LẬP (KHÔNG CẦN BUILD TOOL, CHẠY TRỰC TIẾP TRÊN WEB TĨNH) -->
+    <script src="./src/config.js"></script>
+    <script src="./src/sound.js"></script>
+    <script src="./src/player.js"></script>
+    <script src="./src/enemy.js"></script>
+    <script src="./src/shop.js"></script>
+    <script src="./src/main.js"></script>
+</body>
+</html>
