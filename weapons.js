@@ -1,0 +1,282 @@
+/**
+ * Weapon Definitions & Upgrade Card Database
+ */
+
+const WEAPON_TYPES = {
+    PISTOL: {
+        id: 'pistol',
+        name: 'Súng Lục (Pistol)',
+        description: 'Vũ khí cơ bản cân bằng, độ chính xác cao và sát thương ổn định.',
+        baseCooldown: 550, // 0.55s delay (~1.8 viên/giây)
+        baseDamage: 15,    // Sát thương 15 (1 viên hạ quái 15 HP ở Lv1)
+        bulletSpeed: 650,  // Đạn bay nhanh và chính xác
+        range: 380,
+        knockback: 50,
+        pierce: 1,
+        color: 0x00f3ff,
+        bulletColor: 0x67e8f9,
+        bulletSize: 5,
+        price: 25,
+        iconShape: 'gun'
+    },
+    SHOTGUN: {
+        id: 'shotgun',
+        name: 'Súng Shotgun',
+        description: 'Bắn chùm 5 viên đạn tản rộng, đẩy lùi quái cực mạnh ở cự ly gần.',
+        baseCooldown: 1500, // 1.5s cooldown
+        baseDamage: 9, // per pellet x 5
+        pellets: 5,
+        spreadAngle: 0.45, // radians (~26 độ)
+        bulletSpeed: 440, // Giảm nhẹ tốc độ bay
+        range: 280,
+        knockback: 110,
+        pierce: 1,
+        color: 0xf97316,
+        bulletColor: 0xfdba74,
+        bulletSize: 4.5,
+        price: 35,
+        iconShape: 'shotgun'
+    },
+    SMG: {
+        id: 'smg',
+        name: 'Tiểu Liên SMG',
+        description: 'Tốc độ xả đạn cực nhanh, áp chế đàn quái đông đảo.',
+        baseCooldown: 170,
+        baseDamage: 6,
+        bulletSpeed: 700,
+        range: 330,
+        knockback: 20,
+        pierce: 1,
+        color: 0xfacc15,
+        bulletColor: 0xfef08a,
+        bulletSize: 4,
+        price: 40,
+        iconShape: 'smg'
+    },
+    LASER: {
+        id: 'laser',
+        name: 'Súng Plasma Laser',
+        description: 'Tia năng lượng xuyên phá tối đa 3 kẻ địch trên một đường thẳng.',
+        baseCooldown: 1100,
+        baseDamage: 28,
+        bulletSpeed: 850,
+        range: 440,
+        knockback: 65,
+        pierce: 3,
+        color: 0xd946ef,
+        bulletColor: 0xf0abfc,
+        bulletSize: 6,
+        price: 50,
+        iconShape: 'laser'
+    },
+    ROCKET: {
+        id: 'rocket',
+        name: 'Súng Phóng Lựu Nảy',
+        description: 'Bắn lựu đạn nảy nổ diện rộng, dọn sạch quái vật xung quanh mục tiêu.',
+        baseCooldown: 1800,
+        baseDamage: 50,
+        bulletSpeed: 450,
+        range: 420,
+        knockback: 140,
+        pierce: 1,
+        isExplosive: true,
+        explosionRadius: 90,
+        color: 0xef4444,
+        bulletColor: 0xf87171,
+        bulletSize: 8,
+        price: 45,
+        iconShape: 'rocket'
+    },
+    KATANA: {
+        id: 'katana',
+        name: 'Kiếm Năng Lượng',
+        description: 'Xoay tròn chém càn quét mọi kẻ địch xung quanh với sát thương cao.',
+        baseCooldown: 850,
+        baseDamage: 26,
+        range: 170,
+        knockback: 130,
+        isMelee: true,
+        arcAngle: Math.PI * 0.9,
+        color: 0x10b981,
+        price: 45,
+        iconShape: 'blade'
+    }
+};
+
+// Danh sách thẻ nâng cấp khi Level Up trong trận
+const LEVEL_UP_CARDS = [
+    {
+        id: 'speed_up',
+        title: '👟 Tăng Tốc Độ Chạy',
+        desc: '+15% Tốc độ di chuyển giúp né quái mượt mà hơn.',
+        rarity: 'Common',
+        color: 0x3b82f6,
+        apply: (player) => {
+            player.speedMult = (player.speedMult || 1) + 0.15;
+        }
+    },
+    {
+        id: 'attack_speed',
+        title: '⚡ Tăng Tốc Bắn',
+        desc: '+20% Tốc độ xả đạn cho tất cả 6 vũ khí.',
+        rarity: 'Rare',
+        color: 0xfacc15,
+        apply: (player) => {
+            player.attackSpeedMult = (player.attackSpeedMult || 1) * 0.82; // giảm cooldown
+        }
+    },
+    {
+        id: 'flat_damage',
+        title: '💥 Tăng Sát Thương Gốc',
+        desc: '+3 Sát thương cộng dồn cho mỗi viên đạn bắn ra.',
+        rarity: 'Rare',
+        color: 0xef4444,
+        apply: (player) => {
+            player.flatDamage = (player.flatDamage || 0) + 3;
+        }
+    },
+    {
+        id: 'percent_damage',
+        title: '🔥 Sức Mạnh Cơ Bắp',
+        desc: '+15% Tổng sát thương của người chơi.',
+        rarity: 'Rare',
+        color: 0xf97316,
+        apply: (player) => {
+            player.damageMult = (player.damageMult || 1) + 0.15;
+        }
+    },
+    {
+        id: 'max_hp',
+        title: '❤️ Tăng Máu Tối Đa',
+        desc: '+25 Máu tối đa và hồi ngay 25 Máu.',
+        rarity: 'Common',
+        color: 0x10b981,
+        apply: (player) => {
+            player.maxHp += 25;
+            player.hp = Math.min(player.maxHp, player.hp + 25);
+        }
+    },
+    {
+        id: 'hp_regen',
+        title: '🌿 Hồi Phục Sinh Lực',
+        desc: '+1.5 Máu tự động hồi mỗi giây.',
+        rarity: 'Rare',
+        color: 0x34d399,
+        apply: (player) => {
+            player.hpRegen = (player.hpRegen || 0) + 1.5;
+        }
+    },
+    {
+        id: 'range_up',
+        title: '🎯 Tăng Tầm Bắn',
+        desc: '+25% Tầm bắn phát hiện mục tiêu.',
+        rarity: 'Common',
+        color: 0x8b5cf6,
+        apply: (player) => {
+            player.rangeMult = (player.rangeMult || 1) + 0.25;
+        }
+    },
+    {
+        id: 'crit_chance',
+        title: '🎲 Đòn Chí Mạng',
+        desc: '+12% Tỉ lệ bạo kích nhân 2.0x sát thương.',
+        rarity: 'Epic',
+        color: 0xec4899,
+        apply: (player) => {
+            player.critChance = Math.min(0.85, (player.critChance || 0.05) + 0.12);
+        }
+    },
+    {
+        id: 'magnet_up',
+        title: '🧲 Nam Châm Hút Ngọc',
+        desc: '+40% Bán kính tự động hút hạt EXP & Tiền Vàng.',
+        rarity: 'Common',
+        color: 0x06b6d4,
+        apply: (player) => {
+            player.pickupRadius = (player.pickupRadius || 90) + 40;
+        }
+    },
+    {
+        id: 'armor_up',
+        title: '🛡️ Giáp Cường Hóa',
+        desc: '+3 Giáp bảo hộ (Giảm 12% sát thương nhận vào).',
+        rarity: 'Rare',
+        color: 0x64748b,
+        apply: (player) => {
+            player.armor = (player.armor || 0) + 3;
+        }
+    }
+];
+
+// Danh sách vật phẩm mua tăng chỉ số trong Shop
+const SHOP_STAT_ITEMS = [
+    {
+        id: 'shop_damage',
+        name: 'Tăng Sát Thương Vĩnh Viễn',
+        desc: '+10% Toàn bộ sát thương đầu ra của tất cả vũ khí.',
+        price: 25,
+        type: 'damage',
+        apply: (player) => {
+            player.damageMult = (player.damageMult || 1) + 0.10;
+        }
+    },
+    {
+        id: 'shop_max_hp_armor',
+        name: 'Tăng Giáp & Máu Tối Đa',
+        desc: '+25 Máu tối đa, +1 Giáp và hồi phục đầy bình máu.',
+        price: 30,
+        type: 'hp_armor',
+        apply: (player) => {
+            player.maxHp += 25;
+            player.armor = (player.armor || 0) + 1;
+            player.hp = player.maxHp;
+        }
+    },
+    {
+        id: 'shop_speed',
+        name: 'Tăng Tốc Độ Di Chuyển',
+        desc: '+15% Tốc độ di chuyển giúp né tránh linh hoạt hơn.',
+        price: 20,
+        type: 'speed',
+        apply: (player) => {
+            player.speedMult = (player.speedMult || 1) + 0.15;
+        }
+    },
+    {
+        id: 'shop_atk_speed',
+        name: 'Mô-đun Tăng Tốc Bắn',
+        desc: '+15% Tốc độ bắn toàn bộ vũ khí.',
+        price: 35,
+        type: 'atk_speed',
+        apply: (player) => {
+            player.attackSpeedMult = (player.attackSpeedMult || 1) * 0.85;
+        }
+    },
+    {
+        id: 'shop_crit',
+        name: 'Kính Ngắm Bạo Kích',
+        desc: '+10% Tỉ lệ đòn chí mạng nhân đôi sát thương.',
+        price: 25,
+        type: 'crit',
+        apply: (player) => {
+            player.critChance = Math.min(0.85, (player.critChance || 0.05) + 0.10);
+        }
+    },
+    {
+        id: 'shop_magnet',
+        name: 'Bộ Thu Hút Từ Trường',
+        desc: '+50 Bán kính nam châm nhặt ngọc & vàng.',
+        price: 20,
+        type: 'magnet',
+        apply: (player) => {
+            player.pickupRadius = (player.pickupRadius || 90) + 50;
+        }
+    }
+];
+
+window.GAME_DATA = {
+    WEAPON_TYPES,
+    LEVEL_UP_CARDS,
+    SHOP_STAT_ITEMS
+};
+
