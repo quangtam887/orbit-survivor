@@ -75,10 +75,14 @@ const SkillModalSystem = {
             return c || '#38bdf8';
         };
 
+        const tr = (key, params) => (window.SurvivorGame && window.SurvivorGame.t) ? window.SurvivorGame.t(key, params) : key;
+
         let cardsHtml = '';
         offeredCards.forEach((card, idx) => {
             const borderColor = colorToHex(card.color);
-            const iconText = card.title.slice(0, 2);
+            const cardTitle = card.id ? tr(`card.${card.id}.title`) : card.title;
+            const cardDesc = card.id ? tr(`card.${card.id}.desc`) : card.desc;
+            const iconText = cardTitle.slice(0, 2);
             const rarityColor = card.rarity === 'Epic' ? '#f472b6' : (card.rarity === 'Rare' ? '#fde047' : '#7dd3fc');
 
             cardsHtml += `
@@ -86,18 +90,18 @@ const SkillModalSystem = {
                     <div class="skill-icon-circle" style="border-color: ${borderColor}; color: ${borderColor};">
                         ${iconText}
                     </div>
-                    <div class="skill-card-title">${card.title}</div>
+                    <div class="skill-card-title">${cardTitle}</div>
                     <div class="skill-card-rarity" style="color: ${rarityColor};">[${card.rarity}]</div>
-                    <div class="skill-card-desc">${card.desc}</div>
-                    <button class="select-skill-btn" data-index="${idx}">CHỌN KỸ NĂNG</button>
+                    <div class="skill-card-desc">${cardDesc}</div>
+                    <button class="select-skill-btn" data-index="${idx}">${tr('modal.select_btn')}</button>
                 </div>
             `;
         });
 
         overlay.innerHTML = `
             <div class="skill-modal-header">
-                <div class="skill-modal-title">⭐ TỔNG KẾT VÒNG: CHỌN KỸ NĂNG ⭐</div>
-                <div class="skill-modal-subtitle">Bạn còn ${scene.pendingSkillPicks} lượt chọn thẻ kỹ năng tích lũy!</div>
+                <div class="skill-modal-title">${tr('modal.title')}</div>
+                <div class="skill-modal-subtitle">${tr('modal.subtitle', { count: scene.pendingSkillPicks })}</div>
             </div>
             <div class="skill-cards-grid">
                 ${cardsHtml}
@@ -126,7 +130,7 @@ const SkillModalSystem = {
             scene.updateExpBar();
             scene.rebuildWeaponOrbitals();
             if (scene.pendingBadge) {
-                scene.pendingBadge.setText(`🎁 Thẻ chờ: ${scene.pendingSkillPicks}`);
+                scene.pendingBadge.setText(tr('hud.pending_cards', { count: scene.pendingSkillPicks }));
                 scene.pendingBadge.setVisible(scene.pendingSkillPicks > 0);
             }
 
@@ -337,7 +341,7 @@ class ShopScene extends Phaser.Scene {
         bg.fillRect(0, 0, width, height);
 
         // Header Tiêu đề Shop
-        this.titleText = this.add.text(width / 2, 22, `🛒 CỬA HÀNG LEVEL ${GlobalPlayerState.currentWave} / ${GAME_CONFIG.MAX_WAVES}`, {
+        this.titleText = this.add.text(width / 2, 22, t('shop.title', { level: GlobalPlayerState.currentWave, max: GAME_CONFIG.MAX_WAVES }), {
             fontFamily: 'Orbitron, Outfit, sans-serif',
             fontSize: '20px',
             color: '#38bdf8',
@@ -345,7 +349,7 @@ class ShopScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // Tiền vàng hiện có & tiền vàng nhặt được trong vòng
-        this.goldDisplay = this.add.text(width / 2, 46, `VÀNG HIỆN CÓ: 💰 ${GlobalPlayerState.gold}`, {
+        this.goldDisplay = this.add.text(width / 2, 46, t('shop.gold', { gold: GlobalPlayerState.gold }), {
             fontFamily: 'Outfit, sans-serif',
             fontSize: '18px',
             color: '#facc15',
@@ -353,14 +357,14 @@ class ShopScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         const roundGoldEarned = GlobalPlayerState.roundGold || 0;
-        this.roundGoldText = this.add.text(width / 2, 65, `(Vàng nhặt được trong vòng vừa qua: +💰${roundGoldEarned})`, {
+        this.roundGoldText = this.add.text(width / 2, 65, t('shop.round_gold', { gold: roundGoldEarned }), {
             fontFamily: 'Outfit, sans-serif',
             fontSize: '12px',
             color: '#38bdf8'
         }).setOrigin(0.5);
 
         // Thông báo tích cực đã hồi phục 100% máu sau khi chiến thắng vòng
-        this.healNoticeText = this.add.text(width / 2, 83, '✨ CHIẾN THẮNG VÒNG! ĐÃ HỒI PHỤC 100% MÁU!', {
+        this.healNoticeText = this.add.text(width / 2, 83, t('shop.heal_notice'), {
             fontFamily: 'Outfit, sans-serif',
             fontSize: '13px',
             color: '#34d399',
@@ -388,7 +392,7 @@ class ShopScene extends Phaser.Scene {
     }
 
     createEquippedWeaponsPanel(width, height) {
-        this.weaponsHeader = this.add.text(width / 2, 102, `KHO VŨ KHÍ TRANG BỊ (${GlobalPlayerState.weapons.length} / ${GAME_CONFIG.MAX_WEAPONS} Ô)`, {
+        this.weaponsHeader = this.add.text(width / 2, 102, t('shop.weapons_header', { count: GlobalPlayerState.weapons.length, max: GAME_CONFIG.MAX_WEAPONS }), {
             fontFamily: 'Outfit, sans-serif',
             fontSize: '13px',
             color: '#94a3b8',
@@ -408,7 +412,7 @@ class ShopScene extends Phaser.Scene {
         const spacing = 112;
         const startX = 400 - ((totalSlots - 1) * spacing) / 2;
 
-        this.weaponsHeader.setText(`KHO VŨ KHÍ TRANG BỊ (${GlobalPlayerState.weapons.length} / ${GAME_CONFIG.MAX_WEAPONS} Ô)`);
+        this.weaponsHeader.setText(t('shop.weapons_header', { count: GlobalPlayerState.weapons.length, max: GAME_CONFIG.MAX_WEAPONS }));
 
         for (let i = 0; i < totalSlots; i++) {
             const slotX = startX + i * spacing;
@@ -436,7 +440,7 @@ class ShopScene extends Phaser.Scene {
                 else if (wp.id === 'katana') texKey = 'wp_blade';
 
                 const icon = this.add.sprite(-22, 0, texKey).setScale(0.95);
-                const nameStr = wp.name.split(' ')[0];
+                const nameStr = wp.id ? t(`wp.${wp.id}.short`) : wp.name.split(' ')[0];
                 const wpName = this.add.text(12, -7, nameStr, {
                     fontFamily: 'Outfit, sans-serif',
                     fontSize: '11px',
@@ -446,7 +450,7 @@ class ShopScene extends Phaser.Scene {
 
                 // Nhãn Bán lại vũ khí hoàn tiền (60% giá) - toàn bộ ô 92x44 đều nhận click
                 const refund = Math.max(10, Math.round((wp.price || 30) * 0.6));
-                const sellBtn = this.add.text(12, 8, `Bán 💰${refund}`, {
+                const sellBtn = this.add.text(12, 8, t('shop.sell_btn', { price: refund }), {
                     fontFamily: 'Outfit, sans-serif',
                     fontSize: '10px',
                     color: '#fbbf24',
@@ -468,7 +472,7 @@ class ShopScene extends Phaser.Scene {
                     onOut: () => drawSlotBox(false)
                 });
             } else {
-                const emptyTxt = this.add.text(0, 0, '+ TRỐNG', {
+                const emptyTxt = this.add.text(0, 0, t('shop.empty_slot'), {
                     fontFamily: 'Outfit, sans-serif',
                     fontSize: '12px',
                     color: '#64748b'
@@ -482,7 +486,7 @@ class ShopScene extends Phaser.Scene {
     }
 
     updateGoldDisplay() {
-        this.goldDisplay.setText(`VÀNG HIỆN CÓ: 💰 ${GlobalPlayerState.gold}`);
+        this.goldDisplay.setText(t('shop.gold', { gold: GlobalPlayerState.gold }));
         this.updateStatsFooter();
         if (this.rerollBtnContainer) {
             this.createRerollButton(this.scale.width, this.scale.height);
@@ -503,15 +507,19 @@ class ShopScene extends Phaser.Scene {
         const currentRound = GlobalPlayerState.currentWave;
         const gunPrice = Math.round(basePrice * Math.pow(1.5, currentGunsCount) + Math.min(60, (currentRound - 1) * 3));
 
+        const gunId = this.currentGunOffer.id;
+        const gunTitle = gunId ? t(`wp.${gunId}.short`) : this.currentGunOffer.name.split(' ')[0];
+        const gunDesc = gunId ? t(`wp.${gunId}.desc`) : this.currentGunOffer.description;
+
         const cardsData = [
             // 1. TĂNG SÁT THƯƠNG VĨNH VIỄN (+25% giá mỗi lần mua)
             {
                 id: 'dmg',
-                title: '💥 Tăng Sát Thương',
-                tag: '+10% Vĩnh Viễn',
+                title: t('shop.card.dmg.title'),
+                tag: t('shop.card.dmg.tag'),
                 color: 0xef4444,
-                desc: 'Tăng 10% sát thương cho tất cả các loại vũ khí.',
-                currentVal: `Hiện tại: +${Math.round((GlobalPlayerState.damageMult - 1) * 100)}%`,
+                desc: t('shop.card.dmg.desc'),
+                currentVal: t('shop.card.dmg.val', { val: Math.round((GlobalPlayerState.damageMult - 1) * 100) }),
                 price: GlobalPlayerState.upgradePrices.damage,
                 canBuy: () => GlobalPlayerState.gold >= GlobalPlayerState.upgradePrices.damage,
                 onBuy: () => {
@@ -521,14 +529,14 @@ class ShopScene extends Phaser.Scene {
                     GlobalPlayerState.upgradePrices.damage = Math.round(p * 1.25);
                 }
             },
-            // 2. TĂNG MÁU TỐI ĐA & HỒI MÁU/GIÂY (+25% giá mỗi lần mua)
+            // 2. TĂNG MÁU TỐI ĐA & GIÁP (+25% giá mỗi lần mua)
             {
                 id: 'hp_armor',
-                title: '❤️ +Max HP & Hồi Máu/s',
-                tag: '+25 Max HP & +1.5 HP/s',
+                title: t('shop.card.hp.title'),
+                tag: t('shop.card.hp.tag'),
                 color: 0x10b981,
-                desc: '+25 Máu tối đa (+25 HP hiện tại), +1.5 Hồi máu/giây & +1 Giáp.',
-                currentVal: `Max HP: ${GlobalPlayerState.maxHp} | Hồi: +${(GlobalPlayerState.hpRegen || 0).toFixed(1)}/s | Giáp: ${GlobalPlayerState.armor || 0}`,
+                desc: t('shop.card.hp.desc'),
+                currentVal: t('shop.card.hp.val', { hp: GlobalPlayerState.maxHp, armor: GlobalPlayerState.armor || 0 }),
                 price: GlobalPlayerState.upgradePrices.hp,
                 canBuy: () => GlobalPlayerState.gold >= GlobalPlayerState.upgradePrices.hp,
                 onBuy: () => {
@@ -536,7 +544,6 @@ class ShopScene extends Phaser.Scene {
                     GlobalPlayerState.gold -= p;
                     GlobalPlayerState.maxHp += 25;
                     GlobalPlayerState.hp = Math.min(GlobalPlayerState.maxHp, GlobalPlayerState.hp + 25);
-                    GlobalPlayerState.hpRegen = (GlobalPlayerState.hpRegen || 0) + 1.5;
                     GlobalPlayerState.armor = (GlobalPlayerState.armor || 0) + 1;
                     GlobalPlayerState.upgradePrices.hp = Math.round(p * 1.25);
                 }
@@ -544,11 +551,11 @@ class ShopScene extends Phaser.Scene {
             // 3. TĂNG TỐC ĐỘ DI CHUYỂN (+25% giá mỗi lần mua)
             {
                 id: 'speed',
-                title: '👟 Tốc Di Chuyển',
-                tag: '+15% Tốc Chạy',
+                title: t('shop.card.speed.title'),
+                tag: t('shop.card.speed.tag'),
                 color: 0x38bdf8,
-                desc: 'Tăng 15% tốc độ di chuyển giúp né quái linh hoạt.',
-                currentVal: `Hiện tại: +${Math.round((GlobalPlayerState.speedMult - 1) * 100)}%`,
+                desc: t('shop.card.speed.desc'),
+                currentVal: t('shop.card.speed.val', { val: Math.round((GlobalPlayerState.speedMult - 1) * 100) }),
                 price: GlobalPlayerState.upgradePrices.speed,
                 canBuy: () => GlobalPlayerState.gold >= GlobalPlayerState.upgradePrices.speed,
                 onBuy: () => {
@@ -561,11 +568,11 @@ class ShopScene extends Phaser.Scene {
             // 4. THÊM Ô TRANG BỊ / MUA SÚNG MỚI (GIÁ TĂNG LŨY TIẾN THEO SỐ SÚNG VÀ ROUND)
             {
                 id: 'weapon',
-                title: `🔫 ${this.currentGunOffer.name.split(' ')[0]}`,
-                tag: `Súng ${GlobalPlayerState.weapons.length + 1} / ${GAME_CONFIG.MAX_WEAPONS}`,
+                title: `🔫 ${gunTitle}`,
+                tag: t('shop.card.weapon.tag', { cur: GlobalPlayerState.weapons.length + 1, max: GAME_CONFIG.MAX_WEAPONS }),
                 color: 0xfacc15,
-                desc: this.currentGunOffer.description,
-                currentVal: `Sát thương: ${this.currentGunOffer.baseDamage} | Tốc: ${((this.currentGunOffer.baseCooldown || 600) / 1000).toFixed(1)}s`,
+                desc: gunDesc,
+                currentVal: t('shop.card.weapon.val', { dmg: this.currentGunOffer.baseDamage, cd: ((this.currentGunOffer.baseCooldown || 600) / 1000).toFixed(1) }),
                 price: gunPrice,
                 isWeaponSlot: true,
                 canBuy: () => {
@@ -647,9 +654,9 @@ class ShopScene extends Phaser.Scene {
             };
             drawBuyBtn(false);
 
-            let btnLabel = `MUA: 💰${cData.price}`;
-            if (isFullWeapons) btnLabel = 'ĐẦY 6 Ô SÚNG';
-            else if (!canAfford) btnLabel = `THIẾU VÀNG (💰${cData.price})`;
+            let btnLabel = t('shop.buy_btn', { price: cData.price });
+            if (isFullWeapons) btnLabel = t('shop.full_weapons');
+            else if (!canAfford) btnLabel = t('shop.no_gold', { price: cData.price });
 
             const buyText = this.add.text(0, 0, btnLabel, {
                 fontFamily: 'Outfit, sans-serif',
@@ -673,9 +680,9 @@ class ShopScene extends Phaser.Scene {
                     this.renderEquippedWeapons();
                     this.renderShopUpgradeCards();
                 } else if (isFullWeapons) {
-                    this.showToast('⚠️ Kho vũ khí đã đầy 6/6 ô!', '#f87171');
+                    this.showToast(t('shop.toast.full_weapons'), '#f87171');
                 } else {
-                    this.showToast('⚠️ Chưa đủ vàng để nâng cấp!', '#f87171');
+                    this.showToast(t('shop.toast.no_gold'), '#f87171');
                 }
             }, {
                 onOver: () => {
@@ -742,7 +749,7 @@ class ShopScene extends Phaser.Scene {
         };
         drawRerollBg(false);
 
-        const txt = this.add.text(0, 0, `🎲 LÀM MỚI (💰${this.rerollCost})`, {
+        const txt = this.add.text(0, 0, t('shop.reroll_btn', { cost: this.rerollCost }), {
             fontFamily: 'Outfit, sans-serif',
             fontSize: '13px',
             color: canAfford ? '#ffffff' : '#64748b',
@@ -763,7 +770,7 @@ class ShopScene extends Phaser.Scene {
                 this.renderShopUpgradeCards();
                 this.createRerollButton(width, height);
             } else {
-                this.showToast('⚠️ Chưa đủ vàng để làm mới!', '#f87171');
+                this.showToast(t('shop.toast.no_gold_reroll'), '#f87171');
             }
         }, {
             onOver: () => drawRerollBg(true),
@@ -804,7 +811,7 @@ class ShopScene extends Phaser.Scene {
         };
         drawAdBg(false);
 
-        const txt = this.add.text(0, 0, '📺 REROLL MIỄN PHÍ', {
+        const txt = this.add.text(0, 0, t('shop.free_reroll_btn'), {
             fontFamily: 'Outfit, sans-serif',
             fontSize: '13px',
             color: '#ffffff',
@@ -816,15 +823,15 @@ class ShopScene extends Phaser.Scene {
 
         this.attachInteractiveCardEffects(adBtn, hitArea, () => {
             const rewardId = window.SurvivorGame.REWARD_AD_IDS ? window.SurvivorGame.REWARD_AD_IDS.FREE_REROLL : 'orbit-reward-free-reroll';
-            txt.setText('⏳ ĐANG TẢI QC...');
+            txt.setText(t('shop.ad_loading'));
             window.ytSDK.showRewardedAd(() => {
-                txt.setText('📺 REROLL MIỄN PHÍ');
+                txt.setText(t('shop.free_reroll_btn'));
                 this.currentGunOffer = this.getRandomWeaponOffer();
                 window.retroAudio.reroll();
                 this.renderShopUpgradeCards();
-                this.showToast('🎉 Reroll Miễn Phí Thành Công!', '#a78bfa');
+                this.showToast(t('shop.toast.free_reroll_ok'), '#a78bfa');
             }, () => {
-                txt.setText('❌ QC THẤT BẠI - THỬ LẠI');
+                txt.setText(t('shop.ad_failed'));
             }, rewardId);
         }, {
             onOver: () => drawAdBg(true),
@@ -849,7 +856,7 @@ class ShopScene extends Phaser.Scene {
         };
         drawGoldBg(false);
 
-        const txt = this.add.text(0, 0, '📺 XEM QC NHẬN +100 VÀNG', {
+        const txt = this.add.text(0, 0, t('shop.watch_ad_gold_btn'), {
             fontFamily: 'Outfit, sans-serif',
             fontSize: '13px',
             color: '#ffffff',
@@ -861,16 +868,16 @@ class ShopScene extends Phaser.Scene {
 
         this.attachInteractiveCardEffects(goldBtn, hitArea, () => {
             const rewardId = window.SurvivorGame.REWARD_AD_IDS ? window.SurvivorGame.REWARD_AD_IDS.BONUS_GOLD : 'orbit-reward-100-gold';
-            txt.setText('⏳ ĐANG TẢI QC...');
+            txt.setText(t('shop.ad_loading'));
             window.ytSDK.showRewardedAd(() => {
-                txt.setText('📺 XEM QC NHẬN +100 VÀNG');
+                txt.setText(t('shop.watch_ad_gold_btn'));
                 GlobalPlayerState.gold += 100;
                 window.retroAudio.buy();
                 this.updateGoldDisplay();
                 this.renderShopUpgradeCards();
-                this.showToast('💰 Đã Nhận +100 Vàng!', '#facc15');
+                this.showToast(t('shop.toast.bonus_gold_ok'), '#facc15');
             }, () => {
-                txt.setText('❌ QC THẤT BẠI - THỬ LẠI');
+                txt.setText(t('shop.ad_failed'));
             }, rewardId);
         }, {
             onOver: () => drawGoldBg(true),
@@ -895,7 +902,7 @@ class ShopScene extends Phaser.Scene {
         };
         drawNextBg(false);
 
-        const txt = this.add.text(0, 0, `TIẾP TỤC ⚔️ LEVEL ${GlobalPlayerState.currentWave + 1}`, {
+        const txt = this.add.text(0, 0, t('shop.continue_btn', { next: GlobalPlayerState.currentWave + 1 }), {
             fontFamily: 'Orbitron, Outfit, sans-serif',
             fontSize: '13px',
             color: '#ffffff',
@@ -956,14 +963,20 @@ class ShopScene extends Phaser.Scene {
 
     updateStatsFooter() {
         if (!this.statsFooterText) return;
-        const hpStr = `${Math.round(GlobalPlayerState.hp)}/${GlobalPlayerState.maxHp}`;
-        const regStr = `+${(GlobalPlayerState.hpRegen || 0).toFixed(1)}/s`;
+        const hpStr = `${Math.round(GlobalPlayerState.hp)}`;
         const dmgStr = `+${Math.round((GlobalPlayerState.damageMult - 1) * 100)}%`;
         const spdStr = `+${Math.round((GlobalPlayerState.speedMult - 1) * 100)}%`;
         const atkStr = `+${Math.round((1 - GlobalPlayerState.attackSpeedMult) * 100)}%`;
         const armStr = `${GlobalPlayerState.armor || 0}`;
 
-        this.statsFooterText.setText(`❤️ Máu: ${hpStr} (${regStr})  |  🛡️ Giáp: ${armStr}  |  💥 Sát Thương: ${dmgStr}  |  ⚡ Tốc Bắn: ${atkStr}  |  👟 Tốc Chạy: ${spdStr}`);
+        this.statsFooterText.setText(t('shop.stats_footer', {
+            hp: hpStr,
+            maxHp: GlobalPlayerState.maxHp,
+            armor: armStr,
+            dmg: dmgStr,
+            atk: atkStr,
+            move: spdStr
+        }));
     }
 }
 

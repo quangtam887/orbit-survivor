@@ -528,9 +528,10 @@ const EnemySystem = class EnemySystem {
             });
             scene.cameras.main.shake(350, 0.025);
             window.retroAudio.playTone(180, 'sawtooth', 0.25, 100, 0.5);
+            const t = (window.SurvivorGame && window.SurvivorGame.t) || window.t || ((k) => k);
             const notice = isBossWave
-                ? `☠️ TRÙM BOSS LEVEL ${curWave} (TIER ${tier}) XUẤT HIỆN! ☠️`
-                : `⚠️ MINI-ELITE TIER ${tier} (VÀNG & EXP X5) XUẤT HIỆN! ⚠️`;
+                ? t('enemy.boss_spawn', { level: curWave, tier })
+                : t('enemy.elite_spawn', { tier });
             scene.showBannerNotice(notice, isBossWave ? '#ef4444' : '#facc15');
         }
     }
@@ -700,7 +701,8 @@ const EnemySystem = class EnemySystem {
                 const goldGem = scene.gemPool.get();
                 if (goldGem) goldGem.spawn(enemy.x + ox, enemy.y + oy, 'gold', 2);
             }
-            scene.showBannerNotice('⭐ TIÊU DIỆT MINI-ELITE! +VÀNG & EXP X5! ⭐', '#facc15');
+            const t = (window.SurvivorGame && window.SurvivorGame.t) || window.t || ((k) => k);
+            scene.showBannerNotice(t('enemy.elite_slain'), '#facc15');
         } else if (enemy.isBoss) {
             // Trùm Boss mỗi 10 Level
             for (let i = 0; i < 15; i++) {
@@ -711,7 +713,8 @@ const EnemySystem = class EnemySystem {
                 const goldGem = scene.gemPool.get();
                 if (goldGem) goldGem.spawn(enemy.x + Phaser.Math.Between(-45, 45), enemy.y + Phaser.Math.Between(-45, 45), 'gold', 3);
             }
-            scene.showBannerNotice('👑 ĐẠI THẮNG TRÙM BOSS OVERLORD! 👑', '#ef4444');
+            const t = (window.SurvivorGame && window.SurvivorGame.t) || window.t || ((k) => k);
+            scene.showBannerNotice(t('enemy.boss_slain'), '#ef4444');
         } else {
             // Quái thường
             const expGem = scene.gemPool.get();
@@ -734,11 +737,13 @@ const EnemySystem = class EnemySystem {
         const px = scene.player.x;
         const py = scene.player.y;
 
+        const t = (window.SurvivorGame && window.SurvivorGame.t) || window.t || ((k) => k);
+
         if (scene.isBerserkMode) {
             // Khi đang trong trạng thái Bạo Loạn: Bắt buộc di chuyển thoát xa > 280px tính từ vị trí kích hoạt
             const distEscaped = Phaser.Math.Distance.Between(px, py, scene.berserkOrigin.x, scene.berserkOrigin.y);
             if (scene.berserkBanner) {
-                scene.berserkBanner.setText(`🚨 QUÁI VẬT BẠO LOẠN (+200%)! DI CHUYỂN NGAY!\n(Đã thoát: ${Math.round(distEscaped)}/280px)`);
+                scene.berserkBanner.setText(t('enemy.berserk_active', { dist: Math.round(distEscaped) }));
                 scene.berserkBanner.setVisible(true);
             }
 
@@ -761,7 +766,7 @@ const EnemySystem = class EnemySystem {
                 if (scene.idleTimer >= 7) {
                     const secLeft = Math.max(1, Math.ceil(10 - scene.idleTimer));
                     if (scene.idleWarnText) {
-                        scene.idleWarnText.setText(`⚠️ CẢNH BÁO: HÃY DI CHUYỂN!\nQuái vật sắp nổi loạn sau ${secLeft} giây...`);
+                        scene.idleWarnText.setText(t('enemy.idle_warn', { sec: secLeft }));
                         scene.idleWarnText.setVisible(true);
                         scene.idleWarnText.setAlpha(0.6 + 0.4 * Math.sin(time * 0.015));
                     }
@@ -791,6 +796,7 @@ const EnemySystem = class EnemySystem {
     // Kích hoạt trạng thái Quái vật bạo loạn (Berserk Stampede) khi đứng yên 10s
     static triggerBerserkMode(scene) {
         if (scene.isBerserkMode) return;
+        const t = (window.SurvivorGame && window.SurvivorGame.t) || window.t || ((k) => k);
         scene.isBerserkMode = true;
         scene.idleTimer = 10;
         scene.berserkOrigin = { x: scene.player.x, y: scene.player.y };
@@ -802,11 +808,12 @@ const EnemySystem = class EnemySystem {
         window.retroAudio.playTone(750, 'sawtooth', 0.4, 200, 0.8);
 
         if (scene.berserkBanner) scene.berserkBanner.setVisible(true);
-        scene.showBannerNotice('🚨 QUÁI VẬT BẠO LOẠN (+200%)! DI CHUYỂN NGAY! 🚨', '#ef4444');
+        scene.showBannerNotice(t('enemy.berserk_start'), '#ef4444');
     }
 
     // Tắt trạng thái bạo loạn khi người chơi đã di chuyển > 280px
     static endBerserkMode(scene) {
+        const t = (window.SurvivorGame && window.SurvivorGame.t) || window.t || ((k) => k);
         scene.isBerserkMode = false;
         scene.idleTimer = 0;
         scene.lastMovePosition = { x: scene.player.x, y: scene.player.y };
@@ -814,7 +821,7 @@ const EnemySystem = class EnemySystem {
         if (scene.idleWarnText) scene.idleWarnText.setVisible(false);
 
         window.retroAudio.playTone(480, 'sine', 0.25, 880, 0.35);
-        scene.showBannerNotice('✅ ĐÃ THOÁT KHỎI KHU VỰC BẠO LOẠN! QUÁI HẠ NHIỆT', '#22c55e');
+        scene.showBannerNotice(t('enemy.berserk_end'), '#22c55e');
     }
 }
 

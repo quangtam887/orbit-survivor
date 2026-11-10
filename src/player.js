@@ -75,12 +75,18 @@ const PlayerSystem = class PlayerSystem {
     }
 
     create() {
+        GlobalPlayerState.hpRegen = 0;
+        if (this.scene && this.scene.player) {
+            this.scene.player.hpRegen = 0;
+        }
         PlayerSystem.setupControls(this.scene);
         PlayerSystem.setupVirtualJoystick(this.scene);
         PlayerSystem.rebuildWeaponOrbitals(this.scene);
     }
 
     update(time, delta) {
+        // Không tự động cộng máu theo thời gian (HP Regen bị khóa = 0 để cân bằng game)
+        GlobalPlayerState.hpRegen = 0;
         PlayerSystem.updateMovement(this.scene, delta);
         PlayerSystem.updateOrbitingWeapons(this.scene, delta);
     }

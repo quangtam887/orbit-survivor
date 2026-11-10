@@ -426,18 +426,39 @@ class YouTubePlayablesSDK {
         }
     }
 
-    // Lấy ngôn ngữ từ hệ thống với fallback "vi-VN"
+    // Khởi tạo ngôn ngữ theo chuẩn YouTube Playables SDK (Mặc định Tiếng Anh 'en', chỉ bật 'vi' khi mã ngôn ngữ bắt đầu bằng 'vi')
+    async initLanguage() {
+        let detectedLang = 'en'; // Mặc định bắt buộc là Tiếng Anh
+        try {
+            const yt = (typeof ytgame !== 'undefined') ? ytgame : (typeof window !== 'undefined' ? window.ytgame : undefined);
+            if (yt && yt.IN_PLAYABLES_ENV && yt.system && typeof yt.system.getLanguage === 'function') {
+                const ytLang = await yt.system.getLanguage();
+                if (ytLang && typeof ytLang === 'string' && ytLang.toLowerCase().startsWith('vi')) {
+                    detectedLang = 'vi';
+                }
+            }
+        } catch (err) {
+            console.warn('[YT Playables] Language detection fallback to English');
+        }
+        if (window.SurvivorGame && window.SurvivorGame.I18N && typeof window.SurvivorGame.I18N.setLanguage === 'function') {
+            window.SurvivorGame.I18N.setLanguage(detectedLang);
+        }
+        return detectedLang;
+    }
+
+    // Lấy ngôn ngữ từ hệ thống với fallback "en"
     async getLanguage() {
-        if (this.isPlayablesEnv() && window.ytgame.system && typeof window.ytgame.system.getLanguage === 'function') {
+        const yt = (typeof ytgame !== 'undefined') ? ytgame : (typeof window !== 'undefined' ? window.ytgame : undefined);
+        if (this.isPlayablesEnv() && yt && yt.system && typeof yt.system.getLanguage === 'function') {
             try {
-                const lang = await window.ytgame.system.getLanguage();
+                const lang = await yt.system.getLanguage();
                 if (lang) return lang;
             } catch (e) {
                 console.warn('[YT Playables] getLanguage error:', e);
                 this.logWarning();
             }
         }
-        return 'vi-VN';
+        return 'en';
     }
 
     // 5. Quảng cáo xen kẽ giữa màn (Interstitial Ad)
@@ -535,12 +556,13 @@ class BootScene extends Phaser.Scene {
 
     preload() {
         const { width, height } = this.scale;
+        const t = (window.SurvivorGame && window.SurvivorGame.t) || window.t || ((k) => k);
         const progressBg = this.add.graphics();
         progressBg.fillStyle(0x1e293b, 0.8);
         progressBg.fillRoundedRect(width / 2 - 150, height / 2 - 15, 300, 30, 15);
 
         const progressBar = this.add.graphics();
-        this.add.text(width / 2, height / 2 - 45, 'KHỞI TẠO TỰA GAME...', {
+        this.add.text(width / 2, height / 2 - 45, t('boot.init'), {
             fontFamily: 'Outfit, sans-serif',
             fontSize: '20px',
             color: '#38bdf8',
@@ -555,6 +577,7 @@ class BootScene extends Phaser.Scene {
     }
 
     create() {
+        const t = (window.SurvivorGame && window.SurvivorGame.t) || window.t || ((k) => k);
         // 1. Vẽ giao diện màn hình tải (Loading/Waiting screen) rõ ràng lên Canvas
         if (this.add) {
             const { width, height } = this.scale || { width: 800, height: 600 };
@@ -582,7 +605,7 @@ class BootScene extends Phaser.Scene {
             barFill.fillRoundedRect(width / 2 - 148, height / 2 + 12, 200, 12, 6);
 
             // Dòng chữ trạng thái ĐANG TẢI DỮ LIỆU...
-            this.add.text(width / 2, height / 2 + 42, 'ĐANG TẢI DỮ LIỆU...', {
+            this.add.text(width / 2, height / 2 + 42, t('boot.loading'), {
                 fontFamily: 'Outfit, sans-serif',
                 fontSize: '14px',
                 color: '#94a3b8',
@@ -603,17 +626,16 @@ class BootScene extends Phaser.Scene {
         // 3. Khởi tạo đồ họa procedural textures
         this.createProceduralTextures();
 
-        // 4. Nạp dữ liệu đám mây (Cloud Save) rồi chuyển sang MenuScene
+        // 4. Khởi tạo ngôn ngữ từ YouTube SDK & nạp dữ liệu đám mây (Cloud Save) rồi chuyển sang MenuScene
         const sdk = (window.SurvivorGame && window.SurvivorGame.ytSDK) ? window.SurvivorGame.ytSDK : window.ytSDK;
-        if (sdk && typeof sdk.loadGameProgress === 'function') {
-            sdk.loadGameProgress().then(() => {
-                this.scene.start('MenuScene');
-            }).catch(() => {
-                this.scene.start('MenuScene');
-            });
-        } else {
+        const langPromise = (sdk && typeof sdk.initLanguage === 'function') ? sdk.initLanguage().catch(() => 'en') : Promise.resolve('en');
+        const dataPromise = (sdk && typeof sdk.loadGameProgress === 'function') ? sdk.loadGameProgress().catch(() => null) : Promise.resolve(null);
+
+        Promise.all([langPromise, dataPromise]).then(() => {
             this.scene.start('MenuScene');
-        }
+        }).catch(() => {
+            this.scene.start('MenuScene');
+        });
     }
 
     createProceduralTextures() {
@@ -950,7 +972,9 @@ class MenuScene extends Phaser.Scene {
             ease: 'Sine.easeInOut'
         });
 
-        this.add.text(width / 2, height * 0.22, 'YOUTUBE PLAYABLES EDITION • 3-MINUTE SURVIVAL', {
+        const t = (window.SurvivorGame && window.SurvivorGame.t) || window.t || ((k) => k);
+
+        this.add.text(width / 2, height * 0.22, t('menu.subtitle'), {
             fontFamily: 'Outfit, sans-serif',
             fontSize: '14px',
             color: '#facc15',
@@ -997,7 +1021,7 @@ class MenuScene extends Phaser.Scene {
 
         const rec = window.ytSDK.cachedData;
         const displayHighScore = Math.max(rec.highScore || 0, GlobalPlayerState.highScore || 0);
-        this.add.text(width / 2, height * 0.61, `🏆 KỶ LỤC: ${displayHighScore}   |   🌊 LEVEL CAO NHẤT: ${rec.maxWave || 1} / ${GAME_CONFIG.MAX_WAVES}`, {
+        this.add.text(width / 2, height * 0.61, t('menu.record', { score: displayHighScore, level: rec.maxWave || 1, max: GAME_CONFIG.MAX_WAVES }), {
             fontFamily: 'Outfit, sans-serif',
             fontSize: '15px',
             color: '#facc15',
@@ -1018,7 +1042,7 @@ class MenuScene extends Phaser.Scene {
         btnG.lineStyle(3, 0x38bdf8, 1);
         btnG.strokeRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, btnRadius);
 
-        const playText = this.add.text(0, 0, '⚔️ BẮT ĐẦU CHƠI', {
+        const playText = this.add.text(0, 0, t('menu.play_btn'), {
             fontFamily: 'Orbitron, Outfit, sans-serif',
             fontSize: '22px',
             color: '#ffffff',
@@ -1132,13 +1156,13 @@ class MenuScene extends Phaser.Scene {
         });
 
         // Hướng dẫn điều khiển ngắn gọn
-        this.add.text(width / 2, height * 0.86, '💻 Phím WASD / Mũi tên  |  📱 Chạm kéo Joystick cảm ứng', {
+        this.add.text(width / 2, height * 0.86, t('menu.guide_controls'), {
             fontFamily: 'Outfit, sans-serif',
             fontSize: '14px',
             color: '#64748b'
         }).setOrigin(0.5);
 
-        this.add.text(width / 2, height * 0.91, '🎯 Tự động ngắm & bắn quái gần nhất • 3 phút mỗi vòng • Shop sau trận', {
+        this.add.text(width / 2, height * 0.91, t('menu.guide_gameplay'), {
             fontFamily: 'Outfit, sans-serif',
             fontSize: '13px',
             color: '#94a3b8'
@@ -1340,17 +1364,9 @@ class GameScene extends Phaser.Scene {
                 loop: true
             });
 
-            // HP Regen 1s tick
-            this.time.addEvent({
-                delay: 1000,
-                callback: () => {
-                    if (GlobalPlayerState.hpRegen > 0 && GlobalPlayerState.hp < GlobalPlayerState.maxHp) {
-                        GlobalPlayerState.hp = Math.min(GlobalPlayerState.maxHp, GlobalPlayerState.hp + GlobalPlayerState.hpRegen);
-                        this.updateHpBar();
-                    }
-                },
-                loop: true
-            });
+            // Khóa hpRegen = 0 (không tự động hồi máu theo giây trong trận, chỉ hồi 100% máu khi qua vòng)
+            GlobalPlayerState.hpRegen = 0;
+            if (this.player) this.player.hpRegen = 0;
         } catch (e) {
             console.error("GameScene Create Error:", e);
         }
@@ -1429,6 +1445,7 @@ class GameScene extends Phaser.Scene {
     // HUD Creation
     createHUD() {
         const { width, height } = this.scale;
+        const t = (window.SurvivorGame && window.SurvivorGame.t) || window.t || ((k) => k);
 
         this.hudContainer = this.add.container(0, 0).setScrollFactor(0).setDepth(90);
 
@@ -1439,7 +1456,7 @@ class GameScene extends Phaser.Scene {
         topBar.strokeLineShape(new Phaser.Geom.Line(0, 72, width, 72));
         this.hudContainer.add(topBar);
 
-        this.waveTitleText = this.add.text(width / 2, 16, `LEVEL ${GlobalPlayerState.currentWave} / ${GAME_CONFIG.MAX_WAVES}`, {
+        this.waveTitleText = this.add.text(width / 2, 16, t('hud.level_title', { level: GlobalPlayerState.currentWave, max: GAME_CONFIG.MAX_WAVES }), {
             fontFamily: 'Orbitron, Outfit, sans-serif',
             fontSize: '15px',
             color: '#38bdf8',
@@ -1455,7 +1472,7 @@ class GameScene extends Phaser.Scene {
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        this.enemyCapText = this.add.text(width / 2, 58, `👾 Quái: 0 / ${this.maxActiveEnemies}`, {
+        this.enemyCapText = this.add.text(width / 2, 58, t('hud.enemies', { count: 0, max: this.maxActiveEnemies }), {
             fontFamily: 'Outfit, sans-serif',
             fontSize: '11px',
             color: '#94a3b8',
@@ -1504,14 +1521,14 @@ class GameScene extends Phaser.Scene {
             fontStyle: 'bold'
         }).setOrigin(1, 0);
 
-        this.levelText = this.add.text(width - 20, 38, `⭐ CẤP ${GlobalPlayerState.level}`, {
+        this.levelText = this.add.text(width - 20, 38, t('hud.player_level', { level: GlobalPlayerState.level }), {
             fontFamily: 'Outfit, sans-serif',
             fontSize: '14px',
             color: '#a855f7',
             fontStyle: 'bold'
         }).setOrigin(1, 0);
 
-        this.pendingBadge = this.add.text(width - 20, 56, `🎁 Thẻ chờ: ${this.pendingSkillPicks}`, {
+        this.pendingBadge = this.add.text(width - 20, 56, t('hud.pending_cards', { count: this.pendingSkillPicks }), {
             fontFamily: 'Outfit, sans-serif',
             fontSize: '12px',
             color: '#facc15',
@@ -1602,7 +1619,8 @@ class GameScene extends Phaser.Scene {
         }
 
         if (this.enemyCapText) {
-            this.enemyCapText.setText(`👾 Quái: ${this.getActiveEnemyCount()} / ${this.maxActiveEnemies}`);
+            const t = (window.SurvivorGame && window.SurvivorGame.t) || window.t || ((k) => k);
+            this.enemyCapText.setText(t('hud.enemies', { count: this.getActiveEnemyCount(), max: this.maxActiveEnemies }));
         }
 
         if (this.waveTimer <= 5 && this.waveTimer > 0) {
@@ -1639,10 +1657,11 @@ class GameScene extends Phaser.Scene {
     }
 
     triggerClimaxMode() {
+        const t = (window.SurvivorGame && window.SurvivorGame.t) || window.t || ((k) => k);
         this.timerText.setColor('#ef4444');
         this.cameras.main.shake(400, 0.025);
         window.retroAudio.playTone(160, 'sawtooth', 0.25, 90, 0.55);
-        this.showBannerNotice('⚡ CAO TRÀO: 15 GIÂY SINH TỒN CUỐI CÙNG! ⚡', '#f43f5e');
+        this.showBannerNotice(t('hud.climax_banner'), '#f43f5e');
     }
 
     // MAIN UPDATE LOOP
@@ -1707,6 +1726,7 @@ class GameScene extends Phaser.Scene {
 
             // Cập nhật text số lượng quái và Bậc quái trên HUD
             if (this.enemyCapText) {
+                const t = (window.SurvivorGame && window.SurvivorGame.t) || window.t || ((k) => k);
                 const currentLevel = GlobalPlayerState.currentWave || 1;
                 const activeCount = this.getActiveEnemyCount();
                 const pool = window.SurvivorGame.SlidingTierManager.getLevelPool(currentLevel);
@@ -1717,10 +1737,10 @@ class GameScene extends Phaser.Scene {
                 const maxL = window.SurvivorGame.SlidingTierManager.getTierLetter(maxT);
 
                 if (this.isBerserkMode) {
-                    this.enemyCapText.setText(`🔥 BẠO LOẠN: ${activeCount} quái! (Tier ${maxT} ${maxL})`);
+                    this.enemyCapText.setText(t('hud.berserk_enemies', { count: activeCount, maxT, maxL }));
                     this.enemyCapText.setColor('#ff2222');
                 } else {
-                    this.enemyCapText.setText(`👾 Quái: ${activeCount} / ${this.maxActiveEnemies} | Bậc: T${minT}(${minL}) - T${maxT}(${maxL})`);
+                    this.enemyCapText.setText(t('hud.enemies_tier', { count: activeCount, max: this.maxActiveEnemies, minT, minL, maxT, maxL }));
                     this.enemyCapText.setColor('#94a3b8');
                 }
             }
@@ -1829,15 +1849,16 @@ class GameScene extends Phaser.Scene {
     }
 
     handleLevelUpNotification(count) {
-        this.levelText.setText(`⭐ CẤP ${GlobalPlayerState.level}`);
+        const t = (window.SurvivorGame && window.SurvivorGame.t) || window.t || ((k) => k);
+        this.levelText.setText(t('hud.player_level', { level: GlobalPlayerState.level }));
         if (this.pendingBadge) {
-            this.pendingBadge.setText(`🎁 Thẻ chờ: ${this.pendingSkillPicks}`);
+            this.pendingBadge.setText(t('hud.pending_cards', { count: this.pendingSkillPicks }));
             this.pendingBadge.setVisible(true);
         }
 
         window.retroAudio.levelUp();
 
-        const txt = this.add.text(this.player.x, this.player.y - 30, `⭐ LEVEL UP! (+${count} THẺ CHỜ)`, {
+        const txt = this.add.text(this.player.x, this.player.y - 30, t('hud.level_up_float', { count }), {
             fontFamily: 'Orbitron, Outfit, sans-serif',
             fontSize: '16px',
             color: '#facc15',
@@ -1929,8 +1950,9 @@ class GameScene extends Phaser.Scene {
             GlobalPlayerState.pendingSkillPicks = this.pendingSkillPicks;
             GlobalPlayerState.expToLevel = Math.round(GlobalPlayerState.expToLevel * 1.3);
         }
+        const t = (window.SurvivorGame && window.SurvivorGame.t) || window.t || ((k) => k);
         this.goldText.setText(`💰 ${GlobalPlayerState.gold}`);
-        this.levelText.setText(`⭐ CẤP ${GlobalPlayerState.level}`);
+        this.levelText.setText(t('hud.player_level', { level: GlobalPlayerState.level }));
 
         // Tự động hồi phục 100% máu về mức tối đa ngay khi chiến thắng vòng đấu
         GlobalPlayerState.hp = GlobalPlayerState.maxHp;
@@ -1941,7 +1963,7 @@ class GameScene extends Phaser.Scene {
         this.updateHpBar();
 
         const { width, height } = this.scale;
-        const banner = this.add.text(width / 2, height / 2, `HOÀN THÀNH VÒNG ${GlobalPlayerState.currentWave}!\n✨ ĐÃ HỒI PHỤC 100% MÁU! ✨`, {
+        const banner = this.add.text(width / 2, height / 2, t('hud.wave_complete_banner', { level: GlobalPlayerState.currentWave }), {
             fontFamily: 'Orbitron, Outfit, sans-serif',
             fontSize: '26px',
             color: '#10b981',
@@ -2026,12 +2048,13 @@ class VictoryScene extends Phaser.Scene {
         window.retroAudio.stopBgm();
 
         const { width, height } = this.scale;
+        const t = (window.SurvivorGame && window.SurvivorGame.t) || window.t || ((k) => k);
 
         const bg = this.add.graphics();
         bg.fillGradientStyle(0x064e3b, 0x064e3b, 0x022c22, 0x022c22, 1);
         bg.fillRect(0, 0, width, height);
 
-        this.add.text(width / 2, height * 0.16, '👑 CHIẾN THẮNG TUYỆT ĐỐI! 👑', {
+        this.add.text(width / 2, height * 0.16, t('victory.title'), {
             fontFamily: 'Orbitron, Outfit, sans-serif',
             fontSize: '30px',
             color: '#facc15',
@@ -2040,7 +2063,7 @@ class VictoryScene extends Phaser.Scene {
             strokeThickness: 6
         }).setOrigin(0.5);
 
-        this.add.text(width / 2, height * 0.24, `BẠN ĐÃ SỐNG SÓT QUA CẢ ${GAME_CONFIG.MAX_WAVES} LEVEL VÀ HẠ GỤC ĐẠI TRÙM CUỐI CÙNG!`, {
+        this.add.text(width / 2, height * 0.24, t('victory.subtitle', { max: GAME_CONFIG.MAX_WAVES }), {
             fontFamily: 'Outfit, sans-serif',
             fontSize: '15px',
             color: '#6ee7b7',
@@ -2054,20 +2077,20 @@ class VictoryScene extends Phaser.Scene {
         statsBox.lineStyle(3, 0x10b981, 1);
         statsBox.strokeRoundedRect(width / 2 - 180, height * 0.32, 360, 180, 14);
 
-        this.add.text(width / 2, height * 0.38, `🏆 TỔNG ĐIỂM: ${GlobalPlayerState.currentScore}   |   ⭐ KỶ LỤC: ${GlobalPlayerState.highScore}`, {
+        this.add.text(width / 2, height * 0.38, t('victory.score', { score: GlobalPlayerState.currentScore, best: GlobalPlayerState.highScore }), {
             fontFamily: 'Orbitron, Outfit, sans-serif',
             fontSize: '18px',
             color: '#facc15',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        this.add.text(width / 2, height * 0.44, `👾 Quái đã diệt: ${GlobalPlayerState.enemiesKilled}`, {
+        this.add.text(width / 2, height * 0.44, t('victory.kills', { kills: GlobalPlayerState.enemiesKilled }), {
             fontFamily: 'Outfit, sans-serif',
             fontSize: '16px',
             color: '#e2e8f0'
         }).setOrigin(0.5);
 
-        this.add.text(width / 2, height * 0.50, `💰 Tổng vàng thu thập: ${GlobalPlayerState.gold}`, {
+        this.add.text(width / 2, height * 0.50, t('victory.gold', { gold: GlobalPlayerState.gold }), {
             fontFamily: 'Outfit, sans-serif',
             fontSize: '16px',
             color: '#fbbf24'
@@ -2080,7 +2103,7 @@ class VictoryScene extends Phaser.Scene {
         const btnG = this.add.graphics();
         btnG.fillStyle(0x10b981, 1);
         btnG.fillRoundedRect(-140, -28, 280, 56, 28);
-        const replayTxt = this.add.text(0, 0, '🔄 CHƠI LẠI TRẬN MỚI', {
+        const replayTxt = this.add.text(0, 0, t('victory.replay_btn'), {
             fontFamily: 'Orbitron, Outfit, sans-serif',
             fontSize: '18px',
             color: '#ffffff',
@@ -2116,6 +2139,7 @@ class GameOverScene extends Phaser.Scene {
     create() {
         window.ytSDK.bindScene(this);
         const { width, height } = this.scale;
+        const t = (window.SurvivorGame && window.SurvivorGame.t) || window.t || ((k) => k);
         const rewardIds = window.SurvivorGame.REWARD_AD_IDS || (window.GAME_CONFIG && window.GAME_CONFIG.REWARD_AD_IDS) || {
             BONUS_GOLD: 'orbit-reward-100-gold',
             FREE_REROLL: 'orbit-reward-free-reroll',
@@ -2126,7 +2150,7 @@ class GameOverScene extends Phaser.Scene {
         bg.fillGradientStyle(0x450a0a, 0x450a0a, 0x020617, 0x020617, 1);
         bg.fillRect(0, 0, width, height);
 
-        this.add.text(width / 2, 68, '💀 BẠN ĐÃ HY SINH 💀', {
+        this.add.text(width / 2, 68, t('gameover.title'), {
             fontFamily: 'Orbitron, Outfit, sans-serif',
             fontSize: '28px',
             color: '#ef4444',
@@ -2142,27 +2166,27 @@ class GameOverScene extends Phaser.Scene {
         statsBox.lineStyle(2, 0xef4444, 1);
         statsBox.strokeRoundedRect(width / 2 - 180, 108, 360, 130, 12);
 
-        this.add.text(width / 2, 132, `LEVEL ĐẠT ĐƯỢC: ${GlobalPlayerState.currentWave} / ${GAME_CONFIG.MAX_WAVES}`, {
+        this.add.text(width / 2, 132, t('gameover.level', { level: GlobalPlayerState.currentWave, max: GAME_CONFIG.MAX_WAVES }), {
             fontFamily: 'Orbitron, Outfit, sans-serif',
             fontSize: '15px',
             color: '#f87171',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        this.add.text(width / 2, 162, `🏆 Điểm Số: ${GlobalPlayerState.currentScore}   |   ⭐ Kỷ Lục: ${GlobalPlayerState.highScore}`, {
+        this.add.text(width / 2, 162, t('gameover.score', { score: GlobalPlayerState.currentScore, best: GlobalPlayerState.highScore }), {
             fontFamily: 'Outfit, sans-serif',
             fontSize: '15px',
             color: '#facc15',
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        this.add.text(width / 2, 190, `👾 Quái Tiêu Diệt: ${GlobalPlayerState.enemiesKilled}`, {
+        this.add.text(width / 2, 190, t('gameover.kills', { kills: GlobalPlayerState.enemiesKilled }), {
             fontFamily: 'Outfit, sans-serif',
             fontSize: '14px',
             color: '#cbd5e1'
         }).setOrigin(0.5);
 
-        this.goldDisplay = this.add.text(width / 2, 218, `💰 Vàng Hiện Có: ${GlobalPlayerState.gold}`, {
+        this.goldDisplay = this.add.text(width / 2, 218, t('gameover.gold', { gold: GlobalPlayerState.gold }), {
             fontFamily: 'Outfit, sans-serif',
             fontSize: '14px',
             color: '#fbbf24',
@@ -2179,7 +2203,7 @@ class GameOverScene extends Phaser.Scene {
         rG.lineStyle(3, 0x34d399, 1);
         rG.strokeRoundedRect(-rW / 2, -rH / 2, rW, rH, 25);
 
-        const rTxt = this.add.text(0, 0, `📺 HỒI SINH 100% HP (VÒNG ${GlobalPlayerState.currentWave})`, {
+        const rTxt = this.add.text(0, 0, t('gameover.revive_btn', { level: GlobalPlayerState.currentWave }), {
             fontFamily: 'Orbitron, Outfit, sans-serif',
             fontSize: '13px',
             color: '#ffffff',
@@ -2191,7 +2215,7 @@ class GameOverScene extends Phaser.Scene {
             ? window.SurvivorGame.createContainerHitArea(this, reviveBtn, rW, rH)
             : reviveBtn.setSize(rW, rH).setInteractive({ useHandCursor: true });
         const reviveAction = () => {
-            rTxt.setText('⏳ ĐANG TẢI QUẢNG CÁO...');
+            rTxt.setText(t('shop.ad_loading'));
             window.ytSDK.showRewardedAd(() => {
                 GlobalPlayerState.hp = GlobalPlayerState.maxHp;
                 if (window.retroAudio && typeof window.retroAudio.heal === 'function') {
@@ -2199,7 +2223,7 @@ class GameOverScene extends Phaser.Scene {
                 }
                 this.scene.start('GameScene');
             }, () => {
-                rTxt.setText('❌ XEM QC THẤT BẠI - BẤM THỬ LẠI');
+                rTxt.setText(t('shop.ad_failed'));
             }, rewardIds.REVIVE_PLAYER);
         };
         if (window.SurvivorGame.attachInteractiveCardEffects) {
@@ -2218,7 +2242,7 @@ class GameOverScene extends Phaser.Scene {
         adG.lineStyle(2, 0xfbbf24, 1);
         adG.strokeRoundedRect(-aW / 2, -aH / 2, aW, aH, 23);
 
-        const adTxt = this.add.text(0, 0, '📺 XEM QC NHẬN +100 VÀNG', {
+        const adTxt = this.add.text(0, 0, t('gameover.watch_ad_gold'), {
             fontFamily: 'Outfit, sans-serif',
             fontSize: '14px',
             color: '#ffffff',
@@ -2230,23 +2254,23 @@ class GameOverScene extends Phaser.Scene {
             ? window.SurvivorGame.createContainerHitArea(this, adBtn, aW, aH)
             : adBtn.setSize(aW, aH).setInteractive({ useHandCursor: true });
         const adAction = () => {
-            adTxt.setText('⏳ ĐANG TẢI QUẢNG CÁO...');
+            adTxt.setText(t('shop.ad_loading'));
             window.ytSDK.showRewardedAd(() => {
                 GlobalPlayerState.gold += 100;
-                this.goldDisplay.setText(`💰 Vàng Hiện Có: ${GlobalPlayerState.gold}`);
+                this.goldDisplay.setText(t('gameover.gold', { gold: GlobalPlayerState.gold }));
                 if (window.retroAudio && typeof window.retroAudio.buy === 'function') {
                     window.retroAudio.buy();
                 }
                 adBtn.destroy();
 
-                this.add.text(width / 2, 355, '🎉 ĐÃ NHẬN +100 VÀNG THÀNH CÔNG!', {
+                this.add.text(width / 2, 355, t('gameover.gold_claimed'), {
                     fontFamily: 'Outfit, sans-serif',
                     fontSize: '15px',
                     color: '#facc15',
                     fontStyle: 'bold'
                 }).setOrigin(0.5);
             }, () => {
-                adTxt.setText('❌ XEM QC THẤT BẠI - BẤM THỬ LẠI');
+                adTxt.setText(t('shop.ad_failed'));
             }, rewardIds.BONUS_GOLD);
         };
         if (window.SurvivorGame.attachInteractiveCardEffects) {
@@ -2265,7 +2289,7 @@ class GameOverScene extends Phaser.Scene {
         btnG.lineStyle(2, 0x38bdf8, 1);
         btnG.strokeRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH, 25);
 
-        const retryTxt = this.add.text(0, 0, '⚔️ THỬ LẠI TRẬN MỚI', {
+        const retryTxt = this.add.text(0, 0, t('gameover.retry_btn'), {
             fontFamily: 'Orbitron, Outfit, sans-serif',
             fontSize: '16px',
             color: '#ffffff',
