@@ -947,9 +947,10 @@ class MenuScene extends Phaser.Scene {
             this.input.once('pointermove', unlockAndStartMenuBgm);
         }
 
-        // Background Gradient
+        // Background Gradient (ẩn hoàn toàn khi Three.js 3D Diorama đang chạy nền để liền mạch edge-to-edge)
         const bg = this.add.graphics();
-        bg.fillGradientStyle(0x0b1329, 0x0b1329, 0x030712, 0x030712, 1);
+        const is3D = !!(typeof window !== 'undefined' && window.ThreeRenderer && window.ThreeRenderer.active);
+        bg.fillGradientStyle(0x0b1329, 0x0b1329, 0x030712, 0x030712, is3D ? 0 : 1);
         bg.fillRect(0, 0, width, height);
 
         // Tiêu đề Game chính thức
@@ -982,8 +983,11 @@ class MenuScene extends Phaser.Scene {
             fontStyle: 'bold'
         }).setOrigin(0.5);
 
-        // Hero Preview Avatar ở giữa màn hình xoay vòng 6 vũ khí
+        // Hero Preview Avatar ở giữa màn hình xoay vòng 6 vũ khí (ẩn bản 2D khi Three.js 3D Diorama đang hiển thị)
         const avatarContainer = this.add.container(width / 2, height * 0.40);
+        if (is3D && typeof avatarContainer.setVisible === 'function') {
+            avatarContainer.setVisible(false);
+        }
         const hero = this.add.sprite(0, 0, 'player').setScale(1.6);
         avatarContainer.add(hero);
 
@@ -1250,13 +1254,15 @@ class GameScene extends Phaser.Scene {
             this.physics.world.setBounds(0, 0, GAME_CONFIG.ARENA_WIDTH, GAME_CONFIG.ARENA_HEIGHT);
 
             // Nền Arena
-            this.add.tileSprite(
+            const is3D = !!(typeof window !== 'undefined' && window.ThreeRenderer && window.ThreeRenderer.active);
+            const floorTile = this.add.tileSprite(
                 GAME_CONFIG.ARENA_WIDTH / 2,
                 GAME_CONFIG.ARENA_HEIGHT / 2,
                 GAME_CONFIG.ARENA_WIDTH,
                 GAME_CONFIG.ARENA_HEIGHT,
                 'tile_floor'
             );
+            if (is3D && floorTile && typeof floorTile.setAlpha === 'function') floorTile.setAlpha(0);
 
             // Viền Neon
             const border = this.add.graphics();
@@ -1264,6 +1270,7 @@ class GameScene extends Phaser.Scene {
             border.strokeRect(10, 10, GAME_CONFIG.ARENA_WIDTH - 20, GAME_CONFIG.ARENA_HEIGHT - 20);
             border.lineStyle(2, 0xfca5a5, 0.9);
             border.strokeRect(14, 14, GAME_CONFIG.ARENA_WIDTH - 28, GAME_CONFIG.ARENA_HEIGHT - 28);
+            if (is3D && typeof border.setAlpha === 'function') border.setAlpha(0);
 
             // Player
             this.player = this.physics.add.sprite(
@@ -1274,6 +1281,7 @@ class GameScene extends Phaser.Scene {
             this.player.setCollideWorldBounds(true);
             this.player.body.setCircle(20);
             this.player.setDepth(20);
+            if (is3D && typeof this.player.setAlpha === 'function') this.player.setAlpha(0);
             this.lastMovePosition = { x: this.player.x, y: this.player.y };
 
             // Khởi tạo PlayerSystem và EnemySystem an toàn (hỗ trợ cả class instance lẫn static)
@@ -1349,6 +1357,12 @@ class GameScene extends Phaser.Scene {
 
             // HUD
             this.createHUD();
+            if (is3D && this.hudContainer && typeof this.hudContainer.setVisible === 'function') {
+                this.hudContainer.setVisible(false);
+            }
+            if (is3D && this.particles && typeof this.particles.setAlpha === 'function') {
+                this.particles.setAlpha(0);
+            }
 
             // Overlaps
             this.physics.add.overlap(this.bulletPool, this.enemyPool, this.handleBulletHitEnemy, null, this);
@@ -1390,10 +1404,16 @@ class GameScene extends Phaser.Scene {
     }
 
     performMeleeSlash(x, y, angle, range, dmg, knockback, isCrit) {
+        if (typeof window !== 'undefined' && window.ThreeRenderer && window.ThreeRenderer.active) {
+            window.ThreeRenderer.onMeleeSlash(x, y, angle, range);
+        }
         window.SurvivorGame.PlayerSystem.performMeleeSlash(this, x, y, angle, range, dmg, knockback, isCrit);
     }
 
     createExplosionAoE(x, y, radius, damage) {
+        if (typeof window !== 'undefined' && window.ThreeRenderer && window.ThreeRenderer.active) {
+            window.ThreeRenderer.onExplosion(x, y, radius);
+        }
         window.SurvivorGame.PlayerSystem.createExplosionAoE(this, x, y, radius, damage);
     }
 
@@ -1439,6 +1459,9 @@ class GameScene extends Phaser.Scene {
     }
 
     onEnemyKilled(enemy) {
+        if (typeof window !== 'undefined' && window.ThreeRenderer && window.ThreeRenderer.active && enemy) {
+            window.ThreeRenderer.onEnemyKilled(enemy.x, enemy.y, enemy);
+        }
         window.SurvivorGame.EnemySystem.onEnemyKilled(this, enemy);
     }
 
@@ -1724,6 +1747,26 @@ class GameScene extends Phaser.Scene {
                 window.SurvivorGame.EnemySystem.updateGemAttraction(this, safeDelta);
             }
 
+            // Ẩn các sprite 2D thế giới khi Three.js 3D đang render (giữ nguyên physics/Va chạm Phaser)
+            if (typeof window !== 'undefined' && window.ThreeRenderer && window.ThreeRenderer.active) {
+                if (this.weaponSprites) {
+                    this.weaponSprites.forEach((w) => { if (w.sprite && w.sprite.alpha !== 0) w.sprite.setAlpha(0); });
+                }
+                const hidePool2D = (pool) => {
+                    if (!pool || typeof pool.getChildren !== 'function') return;
+                    const arr = pool.getChildren();
+                    for (let i = 0; i < arr.length; i++) {
+                        const obj = arr[i];
+                        if (obj.alpha !== 0 && typeof obj.setAlpha === 'function') obj.setAlpha(0);
+                        if (obj.tierLabel && obj.tierLabel.visible) obj.tierLabel.setVisible(false);
+                    }
+                };
+                hidePool2D(this.enemies || this.enemyPool);
+                hidePool2D(this.bulletPool);
+                hidePool2D(this.enemyBulletPool);
+                hidePool2D(this.gemPool);
+            }
+
             // Cập nhật text số lượng quái và Bậc quái trên HUD
             if (this.enemyCapText) {
                 const t = (window.SurvivorGame && window.SurvivorGame.t) || window.t || ((k) => k);
@@ -1761,6 +1804,9 @@ class GameScene extends Phaser.Scene {
         enemy.takeDamage(bullet.damage, angle, bullet.knockback);
 
         this.showDamageText(enemy.x, enemy.y, bullet.damage, bullet.isCrit);
+        if (typeof window !== 'undefined' && window.ThreeRenderer && window.ThreeRenderer.active) {
+            window.ThreeRenderer.onEnemyHit(enemy.x, enemy.y, bullet.isCrit);
+        }
         window.retroAudio.enemyHit();
 
         if (bullet.isExplosive) {
@@ -1790,6 +1836,9 @@ class GameScene extends Phaser.Scene {
         window.retroAudio.playerHurt();
 
         this.cameras.main.shake(180, 0.015);
+        if (typeof window !== 'undefined' && window.ThreeRenderer && window.ThreeRenderer.active) {
+            window.ThreeRenderer.onPlayerHurt();
+        }
         this.player.setTintFill(0xff0000);
         this.time.delayedCall(120, () => this.player.clearTint());
 
@@ -1845,6 +1894,9 @@ class GameScene extends Phaser.Scene {
             this.updateExpBar();
         }
 
+        if (typeof window !== 'undefined' && window.ThreeRenderer && window.ThreeRenderer.active) {
+            window.ThreeRenderer.onGemCollect(gem.x, gem.y, gem.gemType === 'gold');
+        }
         gem.deactivate();
     }
 
@@ -1857,6 +1909,9 @@ class GameScene extends Phaser.Scene {
         }
 
         window.retroAudio.levelUp();
+        if (typeof window !== 'undefined' && window.ThreeRenderer && window.ThreeRenderer.active) {
+            window.ThreeRenderer.onLevelUp();
+        }
 
         const txt = this.add.text(this.player.x, this.player.y - 30, t('hud.level_up_float', { count }), {
             fontFamily: 'Orbitron, Outfit, sans-serif',
@@ -1939,7 +1994,10 @@ class GameScene extends Phaser.Scene {
                     GlobalPlayerState.exp += gem.value;
                     GlobalPlayerState.score += gem.value * 10;
                 }
-                gem.deactivate();
+                if (typeof window !== 'undefined' && window.ThreeRenderer && window.ThreeRenderer.active) {
+            window.ThreeRenderer.onGemCollect(gem.x, gem.y, gem.gemType === 'gold');
+        }
+        gem.deactivate();
             }
         });
 
@@ -2323,6 +2381,7 @@ const phaserConfig = {
     parent: 'game-container',
     width: GAME_CONFIG.CANVAS_WIDTH,
     height: GAME_CONFIG.CANVAS_HEIGHT,
+    transparent: true,
     pauseOnBlur: false,
     scale: {
         mode: Phaser.Scale.FIT,
