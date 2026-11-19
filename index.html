@@ -42,8 +42,10 @@
         }
 
         html, body {
-            width: 100vw;
-            height: 100vh;
+            width: 100%;
+            height: 100%;
+            width: 100dvw;
+            height: 100dvh;
             overflow: hidden;
             background-color: #030712;
             background-image: radial-gradient(circle at 50% 50%, #0b1528 0%, #030712 100%);
@@ -55,8 +57,7 @@
             user-select: none;
             -webkit-user-select: none;
             position: fixed;
-            top: 0;
-            left: 0;
+            inset: 0;
         }
 
         #game-container {
@@ -65,9 +66,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            position: absolute;
-            top: 0;
-            left: 0;
+            position: fixed;
+            inset: 0;
             overflow: hidden;
             touch-action: none;
         }
@@ -80,9 +80,13 @@
             -webkit-user-select: none;
         }
 
+        /* Loại bỏ inline margin của Phaser CENTER_BOTH để không bị double-offset với Flexbox -> căn giữa tuyệt đối trên mọi màn hình */
         #game-container > canvas:not(#three-canvas) {
             position: relative;
             z-index: 2;
+            margin: 0 !important;
+            max-width: 100% !important;
+            max-height: 100% !important;
             background: transparent !important;
             box-shadow: none !important;
         }
@@ -101,11 +105,23 @@
         }
 
         .hud-top-row {
-            display: flex;
-            align-items: flex-start;
-            justify-content: space-between;
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: start;
             gap: 10px;
             width: 100%;
+        }
+
+        .hud-hp-cluster {
+            justify-self: start;
+        }
+
+        .hud-center-cluster {
+            justify-self: center;
+        }
+
+        .hud-right-wrap {
+            justify-self: end;
         }
 
         .hud-cluster {
@@ -347,11 +363,13 @@
                 gap: 6px;
             }
             .hud-hp-cluster {
+                justify-self: stretch;
                 min-width: 0;
                 max-width: none;
                 padding: 6px 10px;
             }
             .hud-center-cluster {
+                justify-self: stretch;
                 grid-column: 1 / -1;
                 grid-row: 2;
                 display: flex;
