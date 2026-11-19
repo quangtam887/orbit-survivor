@@ -7,6 +7,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Orbit Survivor: YouTube Playables Edition</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='14' fill='%230b1528' stroke='%2338bdf8' stroke-width='3'/><circle cx='16' cy='16' r='5' fill='%2322d3ee'/></svg>">
 
     <!-- Google Fonts: Orbitron & Outfit -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -15,6 +16,16 @@
 
     <!-- Phaser 3 CDN -->
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
+
+    <!-- Three.js 0.170.0 ES Module Import Map (nhẹ, không cần build tool, hỗ trợ Post-Processing & RoomEnvironment) -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+        }
+    }
+    </script>
 
     <style>
         * {
@@ -63,11 +74,303 @@
 
         canvas {
             display: block;
-            box-shadow: 0 0 50px rgba(2, 132, 199, 0.3);
             outline: none;
             touch-action: none;
             user-select: none;
             -webkit-user-select: none;
+        }
+
+        #game-container > canvas:not(#three-canvas) {
+            position: relative;
+            z-index: 2;
+            background: transparent !important;
+            box-shadow: none !important;
+        }
+
+        /* ==========================================
+           PREMIUM SCI-FI HUD (CHAMFERED TACTICAL UI)
+           ========================================== */
+        #premium-hud {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 20;
+            pointer-events: none;
+            padding: max(12px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .hud-top-row {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .hud-cluster {
+            background: linear-gradient(135deg, rgba(10, 18, 34, 0.84) 0%, rgba(15, 28, 50, 0.72) 100%);
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+            padding: 8px 14px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(186, 230, 253, 0.16);
+        }
+
+        /* Top-Left: Armored Hull HP Meter */
+        .hud-hp-cluster {
+            min-width: 190px;
+            max-width: 240px;
+        }
+        .hud-hp-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 14px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            color: #93c5fd;
+            margin-bottom: 5px;
+            white-space: nowrap;
+        }
+        #hud-hp-val {
+            font-family: 'Orbitron', monospace;
+            font-variant-numeric: tabular-nums;
+            color: #f8fafc;
+            font-size: 12px;
+        }
+        .hud-hp-track {
+            position: relative;
+            height: 12px;
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(148, 163, 184, 0.3);
+            overflow: hidden;
+        }
+        #hud-hp-fill {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, #0ea5e9 0%, #22d3ee 60%, #67e8f9 100%);
+            box-shadow: 0 0 12px rgba(34, 211, 238, 0.7);
+            transition: width 0.14s ease-out, background 0.2s;
+        }
+        #hud-hp-fill.low {
+            background: linear-gradient(90deg, #b91c1c 0%, #ef4444 65%, #fb7185 100%);
+            box-shadow: 0 0 14px rgba(239, 68, 68, 0.85);
+        }
+
+        /* Top-Center: Tactical Wave & Countdown */
+        .hud-center-cluster {
+            text-align: center;
+            padding: 6px 20px;
+            border-color: rgba(250, 204, 21, 0.38);
+            min-width: 148px;
+        }
+        .hud-wave-meta {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            color: #38bdf8;
+        }
+        #hud-enemies {
+            color: #cbd5e1;
+            font-variant-numeric: tabular-nums;
+        }
+        #hud-enemies.berserk {
+            color: #f43f5e;
+        }
+        #hud-timer {
+            font-family: 'Orbitron', monospace;
+            font-variant-numeric: tabular-nums;
+            font-size: 22px;
+            font-weight: 900;
+            color: #facc15;
+            letter-spacing: 0.06em;
+            line-height: 1.15;
+            text-shadow: 0 0 14px rgba(250, 204, 21, 0.45);
+        }
+        #hud-timer.urgent {
+            color: #fb7185;
+            text-shadow: 0 0 16px rgba(244, 63, 94, 0.75);
+        }
+
+        /* Top-Right: Credits, Level, Pending & Icon Controls */
+        .hud-right-wrap {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .hud-res-cluster {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 7px 14px;
+        }
+        .hud-stat {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-family: 'Orbitron', monospace;
+            font-variant-numeric: tabular-nums;
+            font-size: 13px;
+            font-weight: 800;
+        }
+        .hud-gold-dot {
+            width: 9px;
+            height: 9px;
+            background: #fbbf24;
+            transform: rotate(45deg);
+            box-shadow: 0 0 8px #fbbf24;
+            display: inline-block;
+        }
+        #hud-gold { color: #fde047; }
+        #hud-level { color: #c084fc; }
+        #hud-pending {
+            display: none;
+            align-items: center;
+            background: rgba(250, 204, 21, 0.18);
+            border: 1px solid #facc15;
+            color: #fef08a;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 10px;
+            font-weight: 800;
+            padding: 2px 7px;
+            letter-spacing: 0.05em;
+        }
+        .hud-icon-btn {
+            pointer-events: auto;
+            width: 40px;
+            height: 40px;
+            border: 1px solid rgba(56, 189, 248, 0.42);
+            background: rgba(10, 18, 34, 0.86);
+            color: #e2e8f0;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+            transition: background 0.15s, border-color 0.15s, transform 0.12s;
+        }
+        .hud-icon-btn:hover {
+            background: rgba(14, 165, 233, 0.28);
+            border-color: #38bdf8;
+        }
+        .hud-icon-btn:active {
+            transform: scale(0.94);
+        }
+
+        /* Bottom Full-Width Plasma EXP Rail */
+        .hud-exp-rail {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 5px;
+            background: rgba(15, 23, 42, 0.88);
+            z-index: 21;
+        }
+        #hud-exp-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #059669 0%, #10b981 55%, #34d399 100%);
+            box-shadow: 0 0 12px rgba(16, 185, 129, 0.85);
+            transition: width 0.16s ease-out;
+        }
+
+        /* Pause Overlay */
+        #pause-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 30;
+            background: rgba(3, 8, 20, 0.76);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            align-items: center;
+            justify-content: center;
+        }
+        #pause-overlay.open {
+            display: flex;
+        }
+        .pause-panel {
+            background: linear-gradient(155deg, rgba(15, 26, 48, 0.96), rgba(7, 13, 28, 0.98));
+            border: 1px solid rgba(56, 189, 248, 0.5);
+            clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px));
+            padding: 28px 34px;
+            min-width: 280px;
+            text-align: center;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7);
+        }
+        .pause-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 22px;
+            font-weight: 900;
+            color: #38bdf8;
+            letter-spacing: 0.1em;
+            margin-bottom: 18px;
+        }
+        .pause-btn {
+            display: block;
+            width: 100%;
+            margin-top: 10px;
+            padding: 12px 18px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            color: #f8fafc;
+            border: 1px solid rgba(56, 189, 248, 0.55);
+            background: rgba(14, 165, 233, 0.22);
+            cursor: pointer;
+            clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+        }
+        .pause-btn.primary {
+            background: linear-gradient(90deg, #0284c7, #06b6d4);
+            border-color: #7dd3fc;
+        }
+
+        /* Mobile Responsive HUD Tuning */
+        @media (max-width: 640px) {
+            #premium-hud {
+                padding: max(8px, env(safe-area-inset-top)) 8px 8px 8px;
+            }
+            .hud-top-row {
+                display: grid;
+                grid-template-columns: 1fr auto;
+                grid-template-rows: auto auto;
+                gap: 6px;
+            }
+            .hud-hp-cluster {
+                min-width: 0;
+                max-width: none;
+                padding: 6px 10px;
+            }
+            .hud-center-cluster {
+                grid-column: 1 / -1;
+                grid-row: 2;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                padding: 5px 12px;
+                min-width: 0;
+            }
+            #hud-timer { font-size: 17px; }
+            .hud-hp-header {
+                gap: 6px;
+                font-size: 10px;
+            }
+            .hud-hp-label-long { display: none; }
+            #hud-hp-val { font-size: 10px; }
+            #hud-pending { font-size: 9px; padding: 2px 5px; }
+            .hud-res-cluster { padding: 5px 8px; gap: 6px; }
+            .hud-stat { font-size: 11px; }
+            .hud-icon-btn { width: 34px; height: 34px; font-size: 14px; }
         }
 
         /* POPUP CHỌN KỸ NĂNG HTML/CSS OVERLAY CHUẨN HITBOX 100% */
@@ -258,6 +561,49 @@
 </head>
 <body>
     <div id="game-container"></div>
+
+    <!-- PREMIUM TACTICAL 3D HUD OVERLAY -->
+    <div id="premium-hud" aria-label="Game HUD">
+        <div class="hud-top-row">
+            <div class="hud-cluster hud-hp-cluster">
+                <div class="hud-hp-header">
+                    <span>HULL<span class="hud-hp-label-long"> INTEGRITY</span></span>
+                    <span id="hud-hp-val">100/100</span>
+                </div>
+                <div class="hud-hp-track"><div id="hud-hp-fill"></div></div>
+            </div>
+
+            <div class="hud-cluster hud-center-cluster">
+                <div class="hud-wave-meta">
+                    <span id="hud-wave">W1/100</span>
+                    <span>•</span>
+                    <span id="hud-enemies">0/6</span>
+                </div>
+                <div id="hud-timer">03:00</div>
+            </div>
+
+            <div class="hud-right-wrap">
+                <div class="hud-cluster hud-res-cluster">
+                    <span class="hud-stat"><span class="hud-gold-dot"></span><span id="hud-gold">0</span></span>
+                    <span class="hud-stat" id="hud-level">LV 1</span>
+                    <span id="hud-pending">+1 CARD</span>
+                </div>
+                <button id="hud-mute-btn" class="hud-icon-btn" type="button" aria-label="Toggle Sound" title="Sound">🔊</button>
+                <button id="hud-pause-btn" class="hud-icon-btn" type="button" aria-label="Pause Game" title="Pause">⏸</button>
+            </div>
+        </div>
+        <div class="hud-exp-rail"><div id="hud-exp-fill"></div></div>
+    </div>
+
+    <!-- PAUSE OVERLAY -->
+    <div id="pause-overlay" role="dialog" aria-modal="true" aria-label="Paused">
+        <div class="pause-panel">
+            <div class="pause-title">SYSTEM PAUSED</div>
+            <button id="pause-resume-btn" class="pause-btn primary" type="button">RESUME MISSION</button>
+            <button id="pause-restart-btn" class="pause-btn" type="button">RESTART WAVE</button>
+        </div>
+    </div>
+
     <button id="start-game-btn" type="button" aria-label="Bắt đầu chơi game" style="display: none !important;"></button>
 
     <!-- CÁC MODULE GAME ENGINE ĐỘC LẬP (KHÔNG CẦN BUILD TOOL, CHẠY TRỰC TIẾP TRÊN WEB TĨNH) -->
@@ -267,5 +613,46 @@
     <script src="./src/enemy.js"></script>
     <script src="./src/shop.js"></script>
     <script src="./src/main.js"></script>
+    <script type="module" src="./src/three-renderer.js"></script>
+    <script>
+        (function wirePremiumHudButtons() {
+            const muteBtn = document.getElementById('hud-mute-btn');
+            const pauseBtn = document.getElementById('hud-pause-btn');
+            const pauseOverlay = document.getElementById('pause-overlay');
+            const resumeBtn = document.getElementById('pause-resume-btn');
+            const restartBtn = document.getElementById('pause-restart-btn');
+
+            function setPaused(paused) {
+                const game = window.game;
+                const gs = game && game.scene ? game.scene.getScene('GameScene') : null;
+                if (!gs || !gs.scene || !gs.scene.isActive()) return;
+                gs.isRoundPaused = paused;
+                if (gs.physics && gs.physics.world) {
+                    if (paused) gs.physics.world.pause();
+                    else gs.physics.world.resume();
+                }
+                if (pauseOverlay) pauseOverlay.classList.toggle('open', paused);
+            }
+
+            if (muteBtn) {
+                muteBtn.addEventListener('click', () => {
+                    const audio = (window.SurvivorGame && window.SurvivorGame.retroAudio) || window.retroAudio;
+                    if (audio && typeof audio.toggleMute === 'function') {
+                        const muted = audio.toggleMute();
+                        muteBtn.textContent = muted ? '🔇' : '🔊';
+                    }
+                });
+            }
+            if (pauseBtn) pauseBtn.addEventListener('click', () => setPaused(true));
+            if (resumeBtn) resumeBtn.addEventListener('click', () => setPaused(false));
+            if (restartBtn) {
+                restartBtn.addEventListener('click', () => {
+                    if (pauseOverlay) pauseOverlay.classList.remove('open');
+                    if (window.GlobalPlayerState) window.GlobalPlayerState.reset();
+                    if (window.game && window.game.scene) window.game.scene.start('GameScene');
+                });
+            }
+        })();
+    </script>
 </body>
 </html>
